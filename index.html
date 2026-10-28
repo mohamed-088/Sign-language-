@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>قاموس لغة الإشارة التفاعلي</title>
+<script src="https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap');
+*{box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;background:#f3f4f6;margin:0;padding:20px 0;display:flex;flex-direction:column;align-items:center}
+#scaler{position:relative;margin:0 auto}
+#pages-container{display:flex;flex-direction:column;align-items:center;position:absolute;top:0;left:0;width:210mm;transform-origin:top left}
+.a4-page{width:210mm;height:297mm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);margin-bottom:24px;padding:12mm;display:flex;flex-direction:column;position:relative;overflow:hidden;page-break-after:always}
+.section-header{text-align:center;font-size:1.35rem;font-weight:700;color:#1f2937;margin-bottom:8mm;padding-bottom:4px;border-bottom:2px solid #e5e7eb;outline:none;min-height:2rem}
+.section-header[contenteditable="true"]{cursor:text;background:#f0fdf4}
+.section-header[contenteditable="true"]:focus{background:#fff;box-shadow:inset 0 0 0 2px #10b981}
+.grid-container{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6mm;flex-grow:1;min-height:0}
+.sign-card{border:2px solid #cbd5e1;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;background:#fff;position:relative;min-height:0}
+.image-area{flex:1;min-height:0;position:relative;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;touch-action:pan-y}
+.image-area.has-image{cursor:grab;background:#fff;touch-action:none}
+.image-area.has-image:active{cursor:grabbing}
+.uploaded-img{position:absolute;top:0;left:0;transform-origin:center center;user-select:none;-webkit-user-drag:none;max-width:none;max-height:none;touch-action:none}
+.add-icon{font-size:2.5rem;color:#94a3b8;transition:transform .2s,color .2s;pointer-events:none}
+.image-area:hover .add-icon{transform:scale(1.15);color:#3b82f6}
+.card-footer{height:14mm;flex-shrink:0;background:#f1f5f9;border-top:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:700;color:#0f172a;text-align:center;padding:0 4px;outline:none}
+.card-footer[contenteditable="true"]{background:#eff6ff;border-top-color:#93c5fd;cursor:text}
+.card-footer[contenteditable="true"]:focus{background:#fff;box-shadow:inset 0 0 0 2px #3b82f6}
+.card-btn{position:absolute;width:calc(22px*var(--inv,1));height:calc(22px*var(--inv,1));border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:calc(.62rem*var(--inv,1));cursor:pointer;z-index:20;opacity:.85;transition:opacity .2s,transform .2s;border:none}
+.card-btn:hover{opacity:1;transform:scale(1.1)}
+.btn-remove-img{top:6px;right:6px;background:#ef4444;display:none}
+.btn-duplicate{top:6px;left:6px;background:#3b82f6}
+.btn-add-arrow{bottom:calc(14mm + 10px);left:6px;background:#8b5cf6;display:none}
+.zoom-controls{position:absolute;bottom:calc(14mm + 10px);right:6px;display:none;gap:4px;z-index:20}
+.zoom-btn{position:relative;width:calc(22px*var(--inv,1));height:calc(22px*var(--inv,1));border-radius:6px;background:rgba(15,23,42,.75);color:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:calc(.62rem*var(--inv,1));cursor:pointer}
+.zoom-btn:hover{background:rgba(15,23,42,.95)}
+.arrow-wrapper{position:absolute;top:25px;left:25px;width:110px;height:110px;z-index:25;touch-action:none;user-select:none;transform-origin:center center}
+.arrow-wrapper.active{outline:1.5px dashed rgba(59,130,246,.7);border-radius:8px}
+.arrow-svg{width:100%;height:100%;overflow:visible;cursor:move}
+.ctrl-handle{position:absolute;width:calc(13px*var(--inv,1));height:calc(13px*var(--inv,1));border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);z-index:30;display:none;transform:translate(-50%,-50%);touch-action:none}
+.arrow-wrapper.active .ctrl-handle{display:flex;align-items:center;justify-content:center}
+.curve-handle{background:#10b981;cursor:pointer}
+.rotate-handle{background:#3b82f6;cursor:grab;bottom:-14px;left:50%;top:auto}
+.scale-handle{background:#ec4899;cursor:nwse-resize;bottom:-14px;right:-14px;left:auto;top:auto}
+.delete-arrow-handle{background:#ef4444;color:#fff;font-size:7px;cursor:pointer;top:-12px;right:-12px;left:auto}
+.ctrl-handle::after,.card-btn::after,.zoom-btn::after{content:"";position:absolute;inset:-8px;border-radius:50%}
+.free-canvas{position:relative;flex:1;min-height:0;border:2px dashed #cbd5e1;border-radius:10px}
+.free-card-wrap{position:absolute}
+.free-card-wrap>.sign-card{width:100%;height:100%}
+.free-bar{position:absolute;left:0;right:0;height:clamp(24px,calc(26px*var(--inv,1)),40px);top:calc(-1*clamp(24px,calc(26px*var(--inv,1)),40px) - 2px);display:flex;align-items:center;justify-content:space-between;background:#1e293b;color:#fff;border-radius:6px 6px 0 0;font-size:.7rem;padding:0 6px;cursor:move;touch-action:none;user-select:none;z-index:30}
+.free-bar button{background:#ef4444;color:#fff;border:none;border-radius:4px;font-size:.7rem;padding:2px 8px;cursor:pointer}
+.free-resize{position:absolute;right:-7px;bottom:-7px;width:calc(16px*var(--inv,1));height:calc(16px*var(--inv,1));border-radius:50%;background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:nwse-resize;touch-action:none;z-index:40}
+.free-resize::after{content:"";position:absolute;inset:-8px;border-radius:50%}
+.free-add{position:absolute;top:10px;right:10px;background:#4f46e5;color:#fff;font-family:inherit;font-size:.8rem;padding:4px 10px;border:none;border-radius:6px;cursor:pointer;z-index:30}
+.free-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;text-align:center;padding:20px}
+.num-badge{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:15;pointer-events:none;font-size:2.1rem;font-weight:700;line-height:1;color:#e11d48;text-shadow:-2px 0 #fff,2px 0 #fff,0 -2px #fff,0 2px #fff,-2px -2px #fff,2px 2px #fff,-2px 2px #fff,2px -2px #fff}
+.btn-focus{top:6px;right:calc(22px*var(--inv,1) + 10px);background:#0ea5e9;display:none}
+.btn-close-dup{top:6px;left:calc(22px*var(--inv,1) + 10px);background:#475569}
+.in-focus .btn-duplicate,.in-focus .btn-focus,.in-focus .btn-close-dup{display:none!important}
+.sign-card.focus-card{position:fixed;left:0;top:0;margin:0;transform-origin:0 0;z-index:1001;border-color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.55);will-change:transform}
+#save-badge{position:fixed;left:16px;bottom:90px;z-index:60;background:rgba(15,23,42,.85);color:#fff;font-size:.78rem;padding:6px 12px;border-radius:999px;opacity:0;transition:opacity .3s;pointer-events:none}
+#save-badge.on{opacity:1}
+#focus-layer{display:none;position:fixed;inset:0;z-index:1000;touch-action:none}
+#focus-layer.open{display:block}
+#focus-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.65);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transition:opacity .4s}
+#focus-bar{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:1002;opacity:0;transform:translateY(20px);transition:opacity .4s,transform .4s;color:#e2e8f0;font-size:.8rem;text-align:center;padding:0 12px}
+#focus-layer.show #focus-backdrop{opacity:1}
+#focus-layer.show #focus-bar{opacity:1;transform:none}
+#focus-ok{font-family:inherit;font-size:1.1rem;font-weight:700;background:#10b981;color:#fff;border:none;border-radius:999px;padding:10px 34px;box-shadow:0 6px 20px rgba(16,185,129,.5);cursor:pointer}
+.del-page-btn{position:absolute;top:10px;left:10px;background:#ef4444;color:#fff;font-family:inherit;font-size:.75rem;padding:4px 8px;border:none;border-radius:6px;cursor:pointer;z-index:30}
+.del-page-btn:hover{background:#dc2626}
+.add-page-box{width:210mm;max-width:92vw;margin-bottom:14px;padding:22px;border:3px dashed #10b981;border-radius:14px;background:#ecfdf5;color:#047857;font-size:1.15rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer;text-align:center;transition:background .2s,transform .2s}
+.add-page-box:hover{background:#d1fae5;transform:scale(1.01)}
+.floating-actions{position:fixed;bottom:24px;left:24px;z-index:50}
+.float-btn{width:54px;height:54px;border-radius:50%;background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;border:none;transition:transform .2s}
+.float-btn:hover{transform:scale(1.08)}
+@page{size:A4;margin:0}
+@media print{
+  body{background:#fff;padding:0;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #scaler{width:auto!important;height:auto!important;margin:0}
+  #pages-container{position:static!important;transform:none!important;width:auto!important}
+  .a4-page{margin:0;box-shadow:none}
+  #pages-container .a4-page:last-child{page-break-after:auto}
+  .no-print,.card-btn,.zoom-controls,.ctrl-handle,.add-icon,.floating-actions,.del-page-btn,.add-page-box{display:none!important}
+  .arrow-wrapper.active{outline:none!important}
+  .section-header[contenteditable="true"],.card-footer[contenteditable="true"]{background:transparent!important;box-shadow:none!important}
+  .card-footer[contenteditable="true"]{background:#f1f5f9!important;border-top-color:#cbd5e1!important}
+  .section-header:empty{display:none!important}
+  .free-canvas{border-color:transparent!important}
+}
+</style>
+</head>
+<body>
+
+<div id="scaler"><div id="pages-container"></div></div>
+
+<!-- خانة إضافة صفحة جديدة -->
+<div class="add-page-box no-print" onclick="addCustomPage()">
+  <span style="font-size:1.6rem">⊕</span>
+  <span>إضافة صفحة قابلة للتعديل ٩ خانات</span>
+</div>
+
+<div class="add-page-box no-print" onclick="addFreePage()" style="margin-bottom:60px;border-color:#6366f1;background:#eef2ff;color:#4338ca">
+  <span style="font-size:1.6rem">⊕</span>
+  <span>إضافة صفحة حرة (خانات تحركها وتكبرها وتصغرها على راحتك)</span>
+</div>
+
+<div id="focus-layer" class="no-print">
+  <div id="focus-backdrop"></div>
+  <div id="focus-bar"><span>اسحب الصورة لضبطها · + / − للتقريب · ➤ لإضافة سهم</span><button id="focus-ok" type="button">✓ تأكيد</button></div>
+</div>
+
+<div class="floating-actions no-print">
+  <button onclick="window.print()" class="float-btn" title="طباعة (A4)"><span>🖨</span></button>
+</div>
+
+<script>
+const ar = n => String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+// كل خانة تحفظ حالتها (الصورة والسهم) حتى لا تضيع عند إعادة الرسم
+const newItem = label => ({ label, img: null, w: 0, h: 0, x: 0, y: 0, scale: 1, arrows: [] });
+const mk = arr => arr.map(newItem);
+
+const sectionsData = [
+  { title: "الحروف الأبجدية العربية", items: mk(["أ","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","هـ","و","ي"]) },
+  { title: "الأرقام", items: mk(["١","٢","٣","٤","٥","٦","٧","٨","٩","١٠","٢٠","٣٠","٤٠","٥٠","٦٠","٧٠","٨٠","٩٠","١٠٠","٢٠٠","٣٠٠","٤٠٠","٥٠٠","٦٠٠","٧٠٠","٨٠٠","٩٠٠","١٠٠٠"]) },
+  { title: "العائلة", items: mk(["الأب","الأم","الأخ","الأخت","ولد","بنت","الجد","الجدة","العم","العمة","الخال","الخالة","ابن العم","ابن العمة","ابن الخال","ابن الخالة","بنت العم","بنت العمة","بنت الخال","بنت الخالة","ابن الأخ","ابن الأخت","كبير في السن","صغير في السن"]) },
+  { title: "الألوان", items: mk(["أحمر","أزرق","أخضر","أصفر","برتقالي","بنفسجي","وردي","بني","أسود","أبيض","رمادي","فاتح","غامق"]) },
+  { title: "أيام الأسبوع", items: mk(["السبت","الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"]) }
+];
+
+const container = document.getElementById('pages-container');
+const scaler = document.getElementById('scaler');
+let uiScale = 1;
+// تصغير الصفحات تلقائياً لتناسب عرض الشاشة (موبايل / تابلت)
+function fitToScreen() {
+  const first = container.querySelector('.a4-page');
+  if (!first) return;
+  const pw = first.offsetWidth;
+  uiScale = Math.min(1, (document.documentElement.clientWidth - 12) / pw);
+  document.documentElement.style.setProperty('--inv', Math.min(2.4, 1 / uiScale));
+  container.style.transform = `scale(${uiScale})`;
+  scaler.style.width = (pw * uiScale) + 'px';
+  scaler.style.height = (container.offsetHeight * uiScale) + 'px';
+}
+window.addEventListener('resize', fitToScreen);
+new ResizeObserver(fitToScreen).observe(container);
+
+// ===== وضع التركيز: تكبير الخانة أثناء إضافة/ضبط الصورة =====
+let focusScale = 0;
+const S = () => focusScale || uiScale;
+let focusCard = null;
+const layer = document.getElementById('focus-layer');
+
+function openFocus(card) {
+  if (focusCard) return;
+  const r = card.getBoundingClientRect();
+  const w = card.offsetWidth, h = card.offsetHeight;
+  const ph = document.createElement('div');
+  ph.style.cssText = `width:${w}px;height:${h}px;visibility:hidden`;
+  card.parentNode.replaceChild(ph, card);
+  focusCard = { card, ph };
+  setActiveArrow(null);
+  card.classList.add('focus-card', 'in-focus');
+  card.style.width = w + 'px';
+  card.style.height = h + 'px';
+  card.style.transition = 'none';
+  card.style.transform = `translate(${r.left}px,${r.top}px) scale(${uiScale})`;
+  layer.insertBefore(card, document.getElementById('focus-bar'));
+  layer.classList.add('open');
+  document.documentElement.style.overflow = 'hidden';
+  const vw = window.innerWidth, vh = window.innerHeight, bar = 110;
+  const s = Math.min(vw * 0.94 / w, (vh - bar - 20) / h);
+  focusScale = s;
+  card.style.setProperty('--inv', 1 / s);
+  void card.offsetWidth;
+  card.style.transition = 'transform .45s cubic-bezier(.2,.8,.2,1)';
+  card.style.transform = `translate(${(vw - w * s) / 2}px,${(vh - bar - h * s) / 2 + 10}px) scale(${s})`;
+  layer.classList.add('show');
+}
+
+function closeFocus() {
+  const f = focusCard;
+  if (!f || f.closing) return;
+  f.closing = true;
+  setActiveArrow(null);
+  const { card, ph } = f;
+  const r = ph.getBoundingClientRect();
+  layer.classList.remove('show');
+  focusScale = 0;
+  card.style.setProperty('--inv', 1 / uiScale);
+  card.style.transform = `translate(${r.left}px,${r.top}px) scale(${uiScale})`;
+  setTimeout(() => {
+    card.classList.remove('focus-card', 'in-focus');
+    ['width', 'height', 'transform', 'transition'].forEach(p => card.style[p] = '');
+    card.style.removeProperty('--inv');
+    ph.parentNode.replaceChild(card, ph);
+    layer.classList.remove('open');
+    document.documentElement.style.overflow = '';
+    focusCard = null;
+  }, 480);
+}
+document.getElementById('focus-ok').onclick = closeFocus;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFocus(); });
+
+function setActiveArrow(el) {
+  document.querySelectorAll('.arrow-wrapper').forEach(a => a.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+document.addEventListener('pointerdown', e => {
+  const arrow = e.target.closest('.arrow-wrapper');
+  if (arrow) setActiveArrow(arrow);
+  else if (!e.target.closest('.btn-add-arrow')) setActiveArrow(null);
+});
+
+// جعل عنصر نصي قابلاً للتعديل (نص عادي فقط، Enter يحفظ)
+function makeEditable(el, onSave, tip) {
+  el.contentEditable = "true";
+  el.title = tip;
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData.getData('text/plain') || '').replace(/\s*\n\s*/g, ' ');
+    document.execCommand('insertText', false, t);
+  });
+  el.addEventListener('blur', () => onSave(el.textContent.trim()));
+}
+
+function renderAllPages() {
+  container.innerHTML = '';
+  sectionsData.forEach(section => {
+    if (section.free) { renderFreePage(section); return; }
+    for (let start = 0; start < section.items.length; start += 9) {
+      const chunk = section.items.slice(start, start + 9);
+      const page = document.createElement('div');
+      page.className = 'a4-page';
+
+      const header = document.createElement('div');
+      header.className = 'section-header';
+      const pIdx = start / 9;
+      header.textContent = (section.titles && section.titles[pIdx] != null) ? section.titles[pIdx] : section.title;
+      makeEditable(header, t => { (section.titles = section.titles || [])[pIdx] = t; }, "اضغط لتعديل عنوان الصفحة");
+      page.appendChild(header);
+
+      if (section.custom) {
+        const del = document.createElement('button');
+        del.className = 'del-page-btn no-print';
+        del.innerHTML = '<span>🗑</span> حذف الصفحة';
+        del.onclick = () => {
+          if (!confirm('حذف هذه الصفحة بكل ما فيها؟')) return;
+          sectionsData.splice(sectionsData.indexOf(section), 1);
+          renderAllPages();
+        };
+        page.appendChild(del);
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'grid-container';
+      chunk.forEach(item => grid.appendChild(createCard(item, section)));
+      page.appendChild(grid);
+      container.appendChild(page);
+    }
+  });
+}
+
+function createCard(item, section) {
+  const isCustom = !!section.custom;
+  const card = document.createElement('div');
+  card.className = 'sign-card';
+
+  const imgArea = document.createElement('div');
+  imgArea.className = 'image-area';
+  imgArea.innerHTML = '<span class="add-icon">+</span>';
+  if (item.num) {
+    const nb = document.createElement('div');
+    nb.className = 'num-badge';
+    nb.textContent = ar(item.num);
+    imgArea.appendChild(nb);
+  }
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+
+  const btnRemoveImg = document.createElement('button');
+  btnRemoveImg.className = 'card-btn btn-remove-img no-print';
+  btnRemoveImg.innerHTML = '<span>✕</span>';
+  btnRemoveImg.title = 'حذف الصورة';
+
+  const btnDuplicate = document.createElement('button');
+  btnDuplicate.className = 'card-btn btn-duplicate no-print';
+  btnDuplicate.innerHTML = '<span>⧉</span>';
+  btnDuplicate.title = 'تكرار الخانة لإضافة حركة ثانية';
+  btnDuplicate.onclick = e => {
+    e.stopPropagation();
+    let max = 0;
+    section.items.forEach(i => { if (i.label === item.label) max = Math.max(max, i.num || 0); });
+    if (!item.num) item.num = 1;
+    max = Math.max(max, item.num);
+    const n = newItem(item.label);
+    n.num = max + 1;
+    if (section.free) { n.fx = (item.fx || 0) + 24; n.fy = (item.fy || 44) + 24; n.fw = item.fw; n.fh = item.fh; }
+    n.dup = true;
+    section.items.splice(section.items.indexOf(item) + 1, 0, n);
+    renderAllPages();
+  };
+
+  const btnClose = document.createElement('button');
+  btnClose.className = 'card-btn btn-close-dup no-print';
+  btnClose.innerHTML = '✕';
+  btnClose.title = 'إغلاق هذه الخانة المكررة';
+  btnClose.onclick = e => {
+    e.stopPropagation();
+    if (item.img && !confirm('حذف هذه الخانة المكررة مع صورتها؟')) return;
+    section.items.splice(section.items.indexOf(item), 1);
+    const rest = section.items.filter(i => i.label === item.label);
+    if (rest.length === 1) delete rest[0].num;
+    renderAllPages();
+  };
+
+  const btnFocus = document.createElement('button');
+  btnFocus.className = 'card-btn btn-focus no-print';
+  btnFocus.innerHTML = '⤢';
+  btnFocus.title = 'تكبير الخانة للتعديل';
+  btnFocus.onclick = e => { e.stopPropagation(); openFocus(card); };
+
+  const btnAddArrow = document.createElement('button');
+  btnAddArrow.className = 'card-btn btn-add-arrow no-print';
+  btnAddArrow.innerHTML = '<span>➤</span>';
+  btnAddArrow.title = 'إضافة سهم مرن';
+  btnAddArrow.onclick = e => {
+    e.stopPropagation();
+    const d = { x: 0, y: 0, angle: 0, scale: 1, mx: 55, my: 55 };
+    item.arrows.push(d);
+    createArrow(imgArea, item, d, true);
+  };
+
+  const zoomControls = document.createElement('div');
+  zoomControls.className = 'zoom-controls no-print';
+  zoomControls.innerHTML =
+    '<button type="button" class="zoom-btn zoom-in" title="تقريب"><span>+</span></button>' +
+    '<button type="button" class="zoom-btn zoom-out" title="إبعاد"><span>−</span></button>';
+
+  function applyImgTransform(img) {
+    img.style.transform = `translate(${item.x}px, ${item.y}px) scale(${item.scale})`;
+  }
+  function zoomImage(delta) {
+    const img = imgArea.querySelector('.uploaded-img');
+    if (!img) return;
+    setActiveArrow(null);
+    item.scale = Math.max(0.3, Math.min(4, item.scale + delta));
+    applyImgTransform(img);
+  }
+  zoomControls.querySelector('.zoom-in').onclick = e => { e.stopPropagation(); zoomImage(0.15); };
+  zoomControls.querySelector('.zoom-out').onclick = e => { e.stopPropagation(); zoomImage(-0.15); };
+
+  imgArea.addEventListener('wheel', e => {
+    if (!item.img || e.target.closest('.arrow-wrapper')) return;
+    e.preventDefault();
+    zoomImage(e.deltaY < 0 ? 0.1 : -0.1);
+  }, { passive: false });
+
+  function showImage() {
+    const img = document.createElement('img');
+    img.src = item.img;
+    img.className = 'uploaded-img';
+    img.style.width = item.w + 'px';
+    img.style.height = item.h + 'px';
+    applyImgTransform(img);
+    imgArea.appendChild(img);
+    imgArea.classList.add('has-image');
+    imgArea.querySelector('.add-icon').style.display = 'none';
+    btnRemoveImg.style.display = 'flex';
+    btnAddArrow.style.display = 'flex';
+    btnFocus.style.display = 'flex';
+    zoomControls.style.display = 'flex';
+
+    interact(img).draggable({
+      listeners: {
+        start() { setActiveArrow(null); },
+        move(e) {
+          item.x += e.dx / S();
+          item.y += e.dy / S();
+          applyImgTransform(img);
+        }
+      }
+    });
+    item.arrows.forEach(d => createArrow(imgArea, item, d, false));
+  }
+
+  imgArea.onclick = e => {
+    if (!item.img && (e.target === imgArea || e.target.classList.contains('add-icon'))) fileInput.click();
+  };
+
+  fileInput.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const src = ev.target.result;
+      const tmp = new Image();
+      tmp.onload = () => {
+        const aw = imgArea.clientWidth, ah = imgArea.clientHeight;
+        const s = Math.max(aw / tmp.naturalWidth, ah / tmp.naturalHeight);
+        const mxd = 1400, big = Math.max(tmp.naturalWidth, tmp.naturalHeight);
+        let outSrc = src;
+        if (big > mxd) {
+          const k = mxd / big, cv = document.createElement('canvas');
+          cv.width = Math.round(tmp.naturalWidth * k);
+          cv.height = Math.round(tmp.naturalHeight * k);
+          const cx = cv.getContext('2d');
+          cx.fillStyle = '#fff';
+          cx.fillRect(0, 0, cv.width, cv.height);
+          cx.drawImage(tmp, 0, 0, cv.width, cv.height);
+          outSrc = cv.toDataURL('image/jpeg', 0.88);
+        }
+        item.img = outSrc;
+        item.w = tmp.naturalWidth * s;
+        item.h = tmp.naturalHeight * s;
+        item.x = (aw - item.w) / 2;   // توسيط الصورة داخل الخانة
+        item.y = (ah - item.h) / 2;
+        item.scale = 1;
+        item.arrows = [];
+        showImage();
+        openFocus(card);
+        scheduleSave();
+      };
+      tmp.src = src;
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = '';
+  };
+
+  btnRemoveImg.onclick = e => {
+    e.stopPropagation();
+    item.img = null;
+    item.arrows = [];
+    const img = imgArea.querySelector('.uploaded-img');
+    if (img) { interact(img).unset(); img.remove(); }
+    imgArea.querySelectorAll('.arrow-wrapper').forEach(a => a.remove());
+    imgArea.classList.remove('has-image');
+    imgArea.querySelector('.add-icon').style.display = 'block';
+    btnRemoveImg.style.display = 'none';
+    btnAddArrow.style.display = 'none';
+    btnFocus.style.display = 'none';
+    zoomControls.style.display = 'none';
+  };
+
+  const footer = document.createElement('div');
+  footer.className = 'card-footer';
+  footer.textContent = item.label;
+  if (isCustom) makeEditable(footer, t => { item.label = t; }, "اضغط لتعديل الاسم");
+
+  card.appendChild(imgArea);
+  card.appendChild(fileInput);
+  card.appendChild(btnRemoveImg);
+  card.appendChild(btnDuplicate); // الصفحات الإضافية ثابتة (٩ خانات)
+  if (item.dup) card.appendChild(btnClose);
+  card.appendChild(btnFocus);
+  card.appendChild(btnAddArrow);
+  card.appendChild(zoomControls);
+  card.appendChild(footer);
+
+  if (item.img) showImage();
+  return card;
+}
+
+function createArrow(imgArea, item, d, activate) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'arrow-wrapper';
+  wrapper.innerHTML = `
+    <svg class="arrow-svg" viewBox="0 0 110 110">
+      <path class="arrow-path" fill="none" stroke="#111" stroke-width="10.5" stroke-linecap="round"/>
+      <polygon class="arrow-head" points="55,8 44,26 66,26" fill="#111" stroke="#111" stroke-width="5" stroke-linejoin="round"/>
+      <path class="arrow-path" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/>
+      <polygon class="arrow-head" points="55,8 44,26 66,26" fill="#fff"/>
+    </svg>
+    <div class="ctrl-handle curve-handle no-print" title="اسحب لثني السهم"></div>
+    <div class="ctrl-handle rotate-handle no-print" title="اسحب لتدوير السهم"></div>
+    <div class="ctrl-handle scale-handle no-print" title="اسحب لتكبير/تصغير السهم"></div>
+    <div class="ctrl-handle delete-arrow-handle no-print" title="حذف السهم"><span>✕</span></div>`;
+  imgArea.appendChild(wrapper);
+  if (activate) setActiveArrow(wrapper);
+
+  const curveHandle = wrapper.querySelector('.curve-handle');
+
+  const updateTransform = () => {
+    wrapper.style.transform = `translate(${d.x}px, ${d.y}px) rotate(${d.angle}deg) scale(${d.scale})`;
+  };
+  // منحنى بيزييه يمر بالنقطة الخضراء (mx, my) عند المنتصف
+  const updateCurve = () => {
+    const cx = 2 * d.mx - 55, cy = 2 * d.my - 55;
+    wrapper.querySelectorAll('.arrow-path').forEach(p => p.setAttribute('d', `M 55 90 Q ${cx} ${cy} 55 20`));
+    const deg = Math.atan2(20 - cy, 55 - cx) * 180 / Math.PI + 90;
+    wrapper.querySelectorAll('.arrow-head').forEach(h => h.setAttribute('transform', `rotate(${deg} 55 20)`));
+    curveHandle.style.left = d.mx + 'px';
+    curveHandle.style.top = d.my + 'px';
+  };
+  updateCurve();
+  updateTransform();
+
+  wrapper.querySelector('.delete-arrow-handle').onclick = e => {
+    e.stopPropagation();
+    const i = item.arrows.indexOf(d);
+    if (i > -1) item.arrows.splice(i, 1);
+    interact(wrapper).unset();
+    wrapper.remove();
+  };
+
+  // سحب السهم كله
+  interact(wrapper).draggable({
+    ignoreFrom: '.ctrl-handle',
+    listeners: {
+      start() { setActiveArrow(wrapper); },
+      move(e) { d.x += e.dx / S(); d.y += e.dy / S(); updateTransform(); }
+    }
+  });
+
+  // ثني السهم
+  interact(curveHandle).draggable({
+    listeners: {
+      start() { setActiveArrow(wrapper); },
+      move(e) {
+        const rad = -d.angle * Math.PI / 180;
+        const ldx = (e.dx * Math.cos(rad) - e.dy * Math.sin(rad)) / d.scale / S();
+        const ldy = (e.dx * Math.sin(rad) + e.dy * Math.cos(rad)) / d.scale / S();
+        d.mx = Math.max(5, Math.min(105, d.mx + ldx));
+        d.my = Math.max(25, Math.min(85, d.my + ldy));
+        updateCurve();
+      }
+    }
+  });
+
+  // تدوير
+  interact(wrapper.querySelector('.rotate-handle')).draggable({
+    listeners: {
+      start() { setActiveArrow(wrapper); },
+      move(e) {
+        const r = wrapper.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        d.angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI - 90;
+        updateTransform();
+      }
+    }
+  });
+
+  // تكبير/تصغير
+  interact(wrapper.querySelector('.scale-handle')).draggable({
+    listeners: {
+      start() { setActiveArrow(wrapper); },
+      move(e) {
+        const r = wrapper.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        d.scale = Math.max(0.4, Math.min(2.6, Math.hypot(e.clientX - cx, e.clientY - cy) / S() / 72));
+        updateTransform();
+      }
+    }
+  });
+}
+
+function addCustomPage() {
+  sectionsData.push({
+    title: "عنوان الصفحة",
+    custom: true,
+    items: Array.from({ length: 9 }, (_, i) => newItem("كلمة " + ar(i + 1)))
+  });
+  renderAllPages();
+  const pages = container.querySelectorAll('.a4-page');
+  pages[pages.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ===== الصفحة الحرة: خانات تتحرك وتتكبر بحرية =====
+let freeZ = 10;
+function addFreePage() {
+  sectionsData.push({ title: 'صفحة حرة', custom: true, free: true, items: [] });
+  renderAllPages();
+  const pages = container.querySelectorAll('.a4-page');
+  pages[pages.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderFreePage(section) {
+  const page = document.createElement('div');
+  page.className = 'a4-page';
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.textContent = (section.titles && section.titles[0] != null) ? section.titles[0] : section.title;
+  makeEditable(header, t => { (section.titles = section.titles || [])[0] = t; }, 'اضغط لتعديل عنوان الصفحة');
+  page.appendChild(header);
+
+  const del = document.createElement('button');
+  del.className = 'del-page-btn no-print';
+  del.innerHTML = '🗑 حذف الصفحة';
+  del.onclick = () => {
+    if (!confirm('حذف هذه الصفحة بكل ما فيها؟')) return;
+    sectionsData.splice(sectionsData.indexOf(section), 1);
+    renderAllPages();
+  };
+  page.appendChild(del);
+
+  const add = document.createElement('button');
+  add.className = 'free-add no-print';
+  add.textContent = '+ إضافة خانة';
+  add.onclick = () => {
+    const k = section.items.length;
+    const it = newItem('كلمة ' + ar(k + 1));
+    it.fx = 16 + (k % 6) * 26; it.fy = 50 + (k % 6) * 26; it.fw = 200; it.fh = 250;
+    section.items.push(it);
+    renderAllPages();
+  };
+  page.appendChild(add);
+
+  const canvas = document.createElement('div');
+  canvas.className = 'free-canvas';
+  if (!section.items.length) {
+    canvas.innerHTML = '<div class="free-empty no-print">اضغط على "+ إضافة خانة" لإضافة خانة، ثم حركها وكبرها وصغرها بحرية</div>';
+  }
+  section.items.forEach(it => canvas.appendChild(createFreeCard(it, section, canvas)));
+  page.appendChild(canvas);
+  container.appendChild(page);
+}
+
+function createFreeCard(item, section, canvas) {
+  if (item.fx == null) { item.fx = 20; item.fy = 50; item.fw = 200; item.fh = 250; }
+  const wrap = document.createElement('div');
+  wrap.className = 'free-card-wrap';
+  const put = () => {
+    wrap.style.left = item.fx + 'px'; wrap.style.top = item.fy + 'px';
+    wrap.style.width = item.fw + 'px'; wrap.style.height = item.fh + 'px';
+  };
+  put();
+
+  const bar = document.createElement('div');
+  bar.className = 'free-bar no-print';
+  bar.innerHTML = '<span>✥ اسحب للتحريك</span>';
+  const rm = document.createElement('button');
+  rm.textContent = '✕';
+  rm.title = 'حذف الخانة';
+  rm.onclick = e => {
+    e.stopPropagation();
+    if (item.img && !confirm('حذف هذه الخانة مع صورتها؟')) return;
+    section.items.splice(section.items.indexOf(item), 1);
+    renderAllPages();
+  };
+  bar.appendChild(rm);
+
+  const rz = document.createElement('div');
+  rz.className = 'free-resize no-print';
+  rz.title = 'اسحب لتكبير/تصغير الخانة';
+
+  wrap.appendChild(bar);
+  wrap.appendChild(createCard(item, section));
+  wrap.appendChild(rz);
+  wrap.addEventListener('pointerdown', () => { wrap.style.zIndex = ++freeZ; });
+
+  interact(bar).draggable({
+    ignoreFrom: 'button',
+    listeners: {
+      move(e) {
+        item.fx = Math.max(0, Math.min(canvas.clientWidth - item.fw, item.fx + e.dx / S()));
+        item.fy = Math.max(44, Math.min(canvas.clientHeight - item.fh, item.fy + e.dy / S()));
+        put();
+      }
+    }
+  });
+  interact(rz).draggable({
+    listeners: {
+      move(e) {
+        item.fw = Math.max(90, Math.min(canvas.clientWidth - item.fx, item.fw + e.dx / S()));
+        item.fh = Math.max(120, Math.min(canvas.clientHeight - item.fy, item.fh + e.dy / S()));
+        put();
+      }
+    }
+  });
+  return wrap;
+}
+
+// ===== الحفظ التلقائي (IndexedDB في المتصفح) =====
+let loaded = false, saveT = null;
+function idb() {
+  return new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('sign-dict', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  });
+}
+async function dbGet() {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const q = db.transaction('kv').objectStore('kv').get('state');
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+async function dbSet(v) {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const t = db.transaction('kv', 'readwrite');
+    t.objectStore('kv').put(v, 'state');
+    t.oncomplete = () => res();
+    t.onerror = () => rej(t.error);
+  });
+}
+function flash(t) {
+  let b = document.getElementById('save-badge');
+  if (!b) { b = document.createElement('div'); b.id = 'save-badge'; b.className = 'no-print'; document.body.appendChild(b); }
+  b.textContent = t;
+  b.classList.add('on');
+  clearTimeout(b._t);
+  b._t = setTimeout(() => b.classList.remove('on'), 1600);
+}
+async function saveNow() {
+  clearTimeout(saveT); saveT = null;
+  if (!loaded) return;
+  try { await dbSet(sectionsData); flash('تم الحفظ تلقائياً ✓'); }
+  catch (e) { flash('تعذر الحفظ التلقائي'); }
+}
+function scheduleSave() {
+  if (!loaded) return;
+  clearTimeout(saveT);
+  saveT = setTimeout(saveNow, 600);
+}
+const _render = renderAllPages;
+renderAllPages = function () { _render(); scheduleSave(); };
+['pointerup', 'keyup', 'change', 'wheel', 'focusout'].forEach(t => document.addEventListener(t, scheduleSave, true));
+document.addEventListener('click', scheduleSave);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+window.addEventListener('pagehide', saveNow);
+
+(async function init() {
+  try {
+    const saved = await dbGet();
+    if (Array.isArray(saved) && saved.length) {
+      const clean = saved.filter(s => s && Array.isArray(s.items)).map(s => ({
+        title: (s.title || '').replace(/\s*\((?:[^)]*(?:تابع|اضغط|[٠-٩0-9])[^)]*)\)\s*$/, ''), custom: !!s.custom, free: !!s.free, titles: Array.isArray(s.titles) ? s.titles : undefined,
+        items: s.items.map(it => Object.assign(newItem(it.label || ''), it, { arrows: Array.isArray(it.arrows) ? it.arrows : [] }))
+      }));
+      if (clean.length) sectionsData.splice(0, sectionsData.length, ...clean);
+      // تحديث النسخة المحفوظة بالتغييرات الجديدة
+      sectionsData.forEach(s => {
+        if (s.custom) return;
+        s.items.forEach(i => {
+          const mm = (i.label || '').match(/^(.*\S)\s+([٠-٩]+)$/);
+          if (mm && !i.num) { i.label = mm[1]; i.num = Number(mm[2].replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))); }
+        });
+        const cnt = {}, mx = {};
+        s.items.forEach(i => { cnt[i.label] = (cnt[i.label] || 0) + 1; if (i.num) mx[i.label] = Math.max(mx[i.label] || 0, i.num); });
+        s.items.forEach(i => { if (cnt[i.label] === 1) delete i.num; });
+        s.items.forEach(i => { if (cnt[i.label] > 1 && !i.num) i.num = (mx[i.label] = (mx[i.label] || 0) + 1); });
+        if (s.title === 'العائلة والأعمار') s.title = 'العائلة';
+        if (Array.isArray(s.titles)) s.titles = s.titles.map(t => typeof t === 'string'
+          ? t.replace(/\s*\((?:[^)]*(?:تابع|اضغط|[٠-٩0-9])[^)]*)\)\s*$/, '').replace('العائلة والأعمار', 'العائلة') : t);
+        const has = l => s.items.some(i => i.label.replace(/\s+[٠-٩]+$/, '') === l);
+        if (s.title === 'العائلة') {
+          const at = s.items.findIndex(i => i.label === 'الأخت') + 1;
+          const add = ['ولد', 'بنت'].filter(l => !has(l)).map(newItem);
+          if (add.length) s.items.splice(at || s.items.length, 0, ...add);
+          const kin = ['بنت العم', 'بنت العمة', 'بنت الخال', 'بنت الخالة'].filter(l => !has(l)).map(newItem);
+          if (kin.length) { const k = s.items.findIndex(i => i.label === 'ابن الخالة') + 1; s.items.splice(k || s.items.length, 0, ...kin); }
+        }
+        if (s.title === 'الألوان') ['فاتح', 'غامق'].forEach(l => { if (!has(l)) s.items.push(newItem(l)); });
+      });
+    }
+  } catch (e) { /* لا يوجد حفظ سابق */ }
+  loaded = true;
+  renderAllPages();
+})();
+</script>
+</body>
+</html>
